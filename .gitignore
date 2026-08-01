@@ -3,3 +3,6 @@
 
 # 참고용 외부 저장소 — 값은 stage-4-tokens.md에 반영 완료
 material-tokens-main/
+
+# 이전 실행(다른 PRD)의 폐기 산출물 — 커밋 대상 아님
+.archive/

@@ -1,338 +1,378 @@
 # 05 — 컴포넌트 라이브러리
 
-> 입력: `03-screen-list.md`(화면별 필요 컴포넌트 23종) + `04-tokens.md`(B절 JS 상수)
-> 이 단계는 **부품만** 만든다. 화면은 ⑥의 일이다.
-> 23종 전부 Penpot에 실제 생성·등록 완료. 전 컴포넌트 PNG 육안 검증 완료.
+> 입력: `00-env-facts.md` · `02-design-audit.md` · `03-screen-list.md` · `04-tokens.md`
+> 저작 대상: Penpot Page **`3-toss-result`** (id `cf8cfb09-3416-4c32-a2eb-38e95e5c2be9`)
+> `3-toss` 는 읽기 전용 — **이 단계에서 열지도, 쓰지도 않았다.**
+>
+> **화면은 만들지 않았다.** 부품만 만들었다. 화면은 ⑥의 일이다.
+> 도메인: **종합 여행 예약**. 증권·금융 용어 없음.
 
-## 저작 정보
+---
+
+## 0. 이 단계의 결론 4줄
+
+1. **`TR/` 접두 컴포넌트 32개**를 저작했다. 전부 `mainInstance()` 살아 있고 감사 이슈 0건.
+2. 기존 죽은 36개와 **이름이 겹쳐도 안전**하다 — `path` 로 좁혀 찾기 때문. (§6)
+3. **저작 중 함정 3개를 실측으로 발견해 교정했다.** ④의 지침 2개가 실제로는 틀렸다. (§8)
+4. **`export_shape` 가 서비스 장애로 전 시도 실패.** PNG 대신 **속성 감사 + SVG 렌더 검증**으로 대체했다. (§9)
+
+---
+
+## 1. 저작 정보
 
 | 항목 | 값 |
 |---|---|
-| 작업 Page | `김주철` (id `ffc095db-aa26-4198-a59e-1726c8f15b3e`) |
-| id 프리픽스 | `KJC/` |
-| 등록 컴포넌트 수 | **23 / 23** |
-| 저작 영역 | `y = -1400 ~ -1000` (화면 영역과 겹치지 않게 위쪽 음수 y) |
-| 폰트 | `Noto Sans KR` (`fontId: "gfont-noto-sans-kr"`) — 400·700 확인 |
-| Auto Layout | **23개 보드 + 전 중첩 보드 100% flex** (절대좌표 0개) |
+| 작업 Page | **`3-toss-result`** |
+| Page id | `cf8cfb09-3416-4c32-a2eb-38e95e5c2be9` |
+| id 프리픽스 | **`TR/`** (Travel) |
+| 컴포넌트 수 | **32** |
+| 감사 이슈 | **0** |
+| 배치 영역 | **y ≤ -635** (음수 선반). ⑥은 `y >= 0` 에서 저작 |
+
+**Page 게이트 준수**: 모든 저작 호출의 첫 줄에서 `getPageById` 로 Page 를 재고정하고
+`name !== "3-toss-result"` 이면 즉시 throw 했다. Page 전환(`openPage`)은 **별도 호출**로
+먼저 수행하고 그 다음 호출부터 저작했다.
 
 ---
 
-## 🔴 ⑥이 먼저 읽어야 할 것 — ⑤가 실제로 부딪힌 API 사실 5가지
+## 2. 컴포넌트 전체 목록 (32개)
 
-이 절은 추측이 아니다. 전부 이 단계에서 실행하며 확인했다.
+**실제 등록 이름은 `path` + `name` 으로 분리 저장된다.** (§6 필독)
 
-### 1. `04-tokens.md`의 `applyText()`는 그대로 쓰면 폰트가 안 잡힌다
-
-`04`의 B절 헬퍼는 `f.id` / `v.weight` / `v.id`를 참조하는데 **실제 Penpot API에 그런 필드가 없다.**
-실제 필드는 `f.fontId` / `v.fontWeight` / `v.fontVariantId`다.
-`04`의 B-2 검증 스니펫이 `has400:false`를 반환한 것이 이 때문이다(폰트는 정상 존재).
-
-```js
-// 실측한 Font 객체
-{ name:"Noto Sans KR", fontId:"gfont-noto-sans-kr",
-  variants:[{ name:"400", fontVariantId:"regular", fontWeight:"400", fontStyle:"normal" }, ...] }
-```
-
-**⑥은 아래 D절의 교정된 `applyText()`를 쓴다.** `04` B절 원본을 그대로 붙이면 안 된다.
-
-### 2. 컴포넌트 이름의 `/`는 **name이 아니라 path로 흡수된다**
-
-`KJC/StockRow`로 지으면 저장 결과는 `name:"StockRow"`, `path:"KJC"`다.
-따라서 **`c.name === "KJC/StockRow"` 로 찾으면 절대 못 찾는다.**
-그리고 프리픽스는 **보드 이름**에 넣어야 path로 남는다 — 컴포넌트 등록 **후** 이름을 바꾸면 path가 날아간다(실제로 겪음).
-
-```js
-// ✅ 프리픽스로 좁혀 찾는 유일하게 맞는 방법
-const findComp = (short) =>
-  penpot.library.local.components.find(
-    (c) => c.name === short && String(c.path || "").indexOf("KJC") === 0
-  );
-```
-
-> 🔴 이 파일에는 이미 **다른 팀원의 `Button` 컴포넌트**가 올라와 있다(path 없음).
-> 프리픽스로 안 좁히면 남의 컴포넌트를 인스턴스화한다.
-
-### 3. flex 자식 좌표는 **같은 호출 안에서 읽으면 거짓말을 한다**
-
-`appendChild` 직후 `await`로 아무리 기다려도 같은 tool 호출 안에서는 자식이
-`parentX/Y = 0,0`으로 보고된다. **다음 tool 호출에서 읽으면 정상값이 나온다.**
-
-이것 때문에 `AppBar`를 "깨졌다"고 오판하고 한 번 지웠다가 다시 만들었다.
-**⑥은 자식 좌표가 0,0으로 보여도 즉시 지우지 말고 다음 호출에서 다시 읽어라.**
-
-### 4. 보드를 옮기기 **전에** 자식을 append 해야 한다
-
-자식은 절대좌표 `(0,0)`에 태어난다.
-보드를 먼저 `x/y`로 옮겨두고 그 다음에 append 하면 **flex가 자식을 안 잡고 원점에 남긴다.**
-
-```
-✅ 보드 생성(원점) → 자식 append → (대기) → 보드 이동 → 컴포넌트 등록
-❌ 보드 생성 → 보드 이동 → 자식 append     // 자식이 원점에 남는다
-```
-
-### 5. `export_shape`는 자주 `http error`를 뱉고, 첫 장은 미정착 상태로 찍힌다
-
-- `http error`는 **일시적**이다. 같은 id로 재시도하면 성공한다 (여러 번 겪음).
-- 레이아웃 정착 전에 찍히면 요소가 좌상단에 뭉쳐 나온다 → **없다고 판단하기 전에 재-export 1회.**
-  `TabBar`가 실제로 첫 장은 뭉쳐 나왔고 두 번째 장은 정상이었다.
-- `shapeId:"page"`(전체 페이지) export는 **30초 타임아웃으로 실패한다.** 컴포넌트 단위로 찍어라.
+| # | path | name | 크기 | 내부 구조 | 오버라이드 |
+|---|---|---|---|---|---|
+| 1 | `TR / Badge` | `Discount` | 56×22 | Label(11/500) | `characters`, `fills` |
+| 2 | `TR / Badge` | `Deadline` | 76×22 | Label(11/500) | `characters`, `fills` |
+| 3 | `TR / Badge` | `Lowest` | 43×22 | Label(11/500) | `characters`, `fills` |
+| 4 | `TR / Badge` | `Direct` | 34×22 | Label(11/500) | `characters`, `fills` |
+| 5 | `TR / Badge` | `Instant` | 55×22 | Label(11/500) | `characters`, `fills` |
+| 6 | `TR / Button` | `Primary` | 360×50 | Label(16/700) | `characters`, `fills` |
+| 7 | `TR / Button` | `Secondary` | 360×50 | Label(16/700) | `characters`, `fills` |
+| 8 | `TR / Chip` | `Default` | 70×30 | Label(12/400) | `characters`, `fills` |
+| 9 | `TR / Chip` | `Selected` | 58×30 | Label(12/400) | `characters`, `fills` |
+| 10 | `TR / Shell` | `StatusBar` | 390×36 | Time(16/400) + Indicators | `characters` |
+| 11 | `TR / Shell` | `TopBar` | 390×60 | BackIcon + Title(16/500, 고정폭 200) + ActionIcon | `characters`, `fills` |
+| 12 | `TR / Shell` | `TabBar` | 390×80 | TabItem ×5 (Icon 20 + Label 10/400) | `characters`, `fills` |
+| 13 | `TR / Shell` | `HomeIndicator` | 390×34 | Bar 144×5 r12 | — |
+| 14 | `TR / FlightRow` | `Direct` | 390×55 | AirlineBlock(Mark 38 + Name/No) + TimeCol(Times 16/700 + Meta) + Price(16/700) | `characters`, `fills` |
+| 15 | `TR / FlightRow` | `Stopover` | 390×55 | 동상 (Meta 색 `stopover`) | `characters`, `fills` |
+| 16 | `TR / Flight` | `StopoverBar` | 390×27 | Dot + LayoverNote(12/400, 고정폭 300) | `characters` |
+| 17 | `TR / PriceDayCell` | `Default` | 76×48 | Day(12) + Price(11/500) | `characters`, `fills` |
+| 18 | `TR / PriceDayCell` | `Lowest` | 76×48 | 동상 (틴트 배경) | `characters`, `fills` |
+| 19 | `TR / PriceDayCell` | `Selected` | 76×48 | 동상 (brand 배경) | `characters`, `fills` |
+| 20 | `TR / PriceDelta` | `Down` | 46×15 | Delta(12/400, priceDown) | `characters`, `fills` |
+| 21 | `TR / PriceDelta` | `Up` | 40×15 | Delta(12/400, priceUp) | `characters`, `fills` |
+| 22 | `TR / Card` | `DealCard` | 172×196 | Photo 172×108 + Body(City/WasPrice 취소선/NowPrice) | `characters`, `fills`, `fillImage` |
+| 23 | `TR / Card` | `ActivityCard` | 390×77 | Photo 57 + Body(Title/RatingRow/Price) | `characters`, `fills`, `fillImage` |
+| 24 | `TR / Section` | `SectionHeader` | 390×42 | Title(18/500, 고정폭 240) + MoreLink(13/400) | `characters` |
+| 25 | `TR / Watch` | `WatchRow` | 390×58 | CityBlock(Photo 38 + City/Price) + Delta | `characters`, `fills` |
+| 26 | `TR / Compare` | `CompareRow` | 390×34 | RowLabel(96) + ValueA(110) + ValueB(110) | `characters`, `fills` |
+| 27 | `TR / Compare` | `CompareTray` | 390×68 | Counter(140) + CompareButton | `characters`, `fills` |
+| 28 | `TR / Fare` | `FareOption` | 360×153 | Body(Grade/Price/Condition ×3) + Radio 24 | `characters`, `fills` |
+| 29 | `TR / State` | `EmptyState` | 390×212 | Icon 57 + Title(고정폭 300) + Description | `characters` |
+| 30 | `TR / State` | `SkeletonRow` | 390×72 | Bar ×3 (skeleton 색, r6) | — |
+| 31 | `TR / State` | `SuggestionRow` | 390×34 | Label(220) + Count(80, link색) | `characters` |
+| 32 | `TR / Common` | `InfoRow` | 390×32 | Label(160) + Value(160) | `characters` |
 
 ---
 
-## A. 컴포넌트 목록 (23종)
+## 3. Variant 위계 (⑥이 이걸 보고 고른다)
 
-크기 단위는 px. `오버라이드`는 ⑥이 인스턴스에서 바꿔도 되는 자식 **이름**이다.
+같은 역할은 **개별 컴포넌트로 흩지 않고 variant 로 묶었다.** ⑥은 아래 위계로 고른다.
 
-### 원자
-
-| 컴포넌트 | 크기 | 내부 구조 (자식 이름) | 오버라이드 가능 | PNG |
+| 역할 | variant (강조 높은 순) | 언제 쓰나 | 한 화면 허용 | ② 근거 |
 |---|---|---|---|---|
-| `KJC/ChangeBadge` | 64×24 | `Value` | `characters` / 보드 `fills`(틴트) / `Value.fills` | ✅ |
-| `KJC/ChipToggle` | 96×32 | `Label` | `characters` / 보드 `fills`·`strokes` / `Label.fills` | ✅ |
-| `KJC/SectionHeader` | 358×28 | `Title`, `More` | 둘 다 `characters` / `More.hidden`으로 더보기 제거 | ✅ |
-| `KJC/SkeletonRow` | 358×72 | `BarWide`, `BarNarrow` | 각 바 `resize()`로 폭 변주 | ✅ |
-| `KJC/DividerBlock` | 390×4 | (없음) | 없음 — 섹션 구분 블록 | ✅ |
+| **Button** | `Primary` → `Secondary` | Primary = 화면의 주 액션 | **Primary 1개** | ② A-3 "`#4880ee` 유일한 주 액션색" |
+| **Chip** | `Selected` → `Default` | 필터·카테고리 | Selected 복수 가능 | ② G8 (47×30, r6) |
+| **Badge** | `Deadline` → `Discount` → `Lowest`/`Instant` → `Direct` | 마감>할인>최저>속성 | **유채색 화면당 1~2개** | ② G9 (53×22, r20) |
+| **PriceDayCell** | `Selected` → `Lowest` → `Default` | 날짜 스트립 | Selected 1, Lowest 1 | ③ R3 |
+| **FlightRow** | `Direct` → `Stopover` | 직항/경유 | 혼재 | ③ R1·R2 |
+| **PriceDelta** | `Down`(이득) / `Up`(불리) | 가격 변동 | 혼재 | ④ A-4 |
 
-### 기본
-
-| 컴포넌트 | 크기 | 내부 구조 | 오버라이드 가능 | PNG |
-|---|---|---|---|---|
-| `KJC/PrimaryButton` | 358×48 | `Label` | `characters` / 보드 `fills`(매수 red·매도 blue·비활성) | ✅ |
-| `KJC/SearchField` | 358×44 | `SearchIcon`, `Placeholder` | `Placeholder.characters`·`fills`(입력값 있으면 primary) | ✅ |
-| `KJC/InfoKeyValue` | 358×40 | `Key`, `Value` | 둘 다 `characters` / `Value.fills`(강조) | ✅ |
-| `KJC/AppBar` | 390×52 | `BackIcon`, `Title`, `ActionIcon` | `Title.characters` / 아이콘 `hidden`으로 좌우 슬롯 제거 | ✅ |
-| `KJC/TabBar` | 390×58 | `Tab-관심`·`Tab-발견`·`Tab-검색`·`Tab-내정보` (각 `Icon`+`Label`) | 각 탭 `Icon.fills`·`Label.fills`로 활성 인덱스 이동 | ✅ |
-
-### 복합
-
-| 컴포넌트 | 크기 | 내부 구조 | 오버라이드 가능 | PNG |
-|---|---|---|---|---|
-| `KJC/StockRow` | 358×72 | `Info`(`Name`,`Code`) · `Metrics`(`Price`,`Change`) | 4개 전부 `characters` / `Change.fills` | ✅ |
-| `KJC/RecommendCard` | 358×92 | `Head`(`Name`,`PriceChange`) · `Reason` | 3개 `characters` / `PriceChange.fills` | ✅ |
-| `KJC/IssueCard` | 358×96 | `Head`(`Tag`>`TagLabel`, `Title`) · `RelatedStocks` | `TagLabel`·`Title`·`RelatedStocks` `characters` / `Tag.fills`(호재↔악재) | ✅ |
-| `KJC/ConsensusBar` | 358×76 | `Head`(`Label`,`TargetPrice`) · `Bar`(`SegBuy`,`SegHold`,`SegSell`) · `Legend`(`BuyCount`,`HoldCount`,`SellCount`) | 텍스트 전부 / 세그먼트는 `resize(w,12)`로 비율 조정 | ✅ |
-| `KJC/EarningsRow` | 358×44 | `Name` · `Meta`(`Date`, `SurpriseBadge`>`SurpriseLabel`) | 텍스트 `characters` / `SurpriseBadge.hidden` | ✅ |
-| `KJC/ThemeCard` | 172×88 | `ThemeName`, `ThemeChange`, `TopStocks` | 3개 `characters` / `ThemeChange.fills` | ✅ |
-| `KJC/PeriodTabs` | 358×32 | `Seg-1일`~`Seg-1년` (각 `Label`) | 각 `Seg-*.fills` + `Label.fills`로 활성 이동 | ✅ |
-| `KJC/ListRowSelectable` | 358×44 | `Text`(`Label`,`Description`) · `Check` | 텍스트 `characters` / `Check.fills`·`hidden` | ✅ |
-| `KJC/StatusBanner` | 358×44 | `Icon`, `Message`, `Action` | `characters` / 보드·`Icon`·`Message` `fills`(error↔info) | ✅ |
-| `KJC/EmptyState` | 358×220 | `Illustration`, `Title`, `Description` | 텍스트 `characters` | ✅ |
-| `KJC/QuantityStepper` | 358×44 | `Minus`, `Value`, `Plus` | `Value.characters` / `Minus`·`Plus` `fills`(활성 여부) | ✅ |
-| `KJC/BottomSheet` | 390×280 | `Handle`, `Title`, `ContentSlot` | `Title.characters` / `ContentSlot`에 자식 append / 보드 `resize`로 높이 | ✅ |
-| `KJC/StyleSetupPromptCard` | 358×108 | `Title`, `Description`, `CTA`>`CTALabel` | 3개 `characters` | ✅ |
-
-> `BottomSheet`의 `ContentSlot`은 **일부러 빈 column flex 보드**다.
-> ⑥이 여기에 `ListRowSelectable`·`QuantityStepper` 인스턴스를 append 하면 자동 정렬된다.
+> **`Direct` 뱃지와 `FlightRow/Direct` 는 다른 것이다.** 전자는 라벨 뱃지, 후자는 행 전체다.
+> 뱃지는 `TR / Badge`, 행은 `TR / FlightRow` 로 path 가 갈린다.
 
 ---
 
-## B. 오버라이드 시험 결과 (실제로 인스턴스 만들어서 시험함)
+## 4. 치수 출처 (전부 `02-design-audit.md` 실측)
 
-| 컴포넌트 | 바꾼 것 | 됐나 | 비고 |
+**M3 규격서(`m3-components_v2.md`)는 이 저장소에 없다.** 따라서 치수는 지시대로
+**② 실측값**을 기준으로 삼았다. (오케스트레이터 지시: "치수는 `02`의 실측값을 따르라")
+
+| 컴포넌트 | 높이 | 모서리 | 좌우 패딩 | ② 출처 |
+|---|---|---|---|---|
+| Badge | **22** | 20 | 7 | G9 (53×22, r20, pad 4/7) |
+| Chip | **30** | 6 | 13 | G8 (47×30, r6, pad 8/13/7/13) |
+| Button | 50 | 6 | 20 | G8 라운드 + 터치 44 이상 확보 |
+| FlightRow | **55** | 20 | 22 | G3 (360×55, pad 7/22) — **주 리스트 행 표준** |
+| WatchRow | 58 | 20 | 22 | G3 계열 |
+| ActivityCard | 77 | 20 | 22 | G4 (390×69, 아바타 57) 계열 |
+| SectionHeader | **42** | — | 22 | G11 (390×42, pad 10/22, 18/500) |
+| TabBar | **80** | 20 | 18 | G1 (390×80, r20, gap 50, hairline) |
+| StatusBar | **36** | — | 14/16 | G12 (360×36) |
+| TopBar | **60** | — | 22 | G15 (390×60, 16/500) |
+| HomeIndicator | 34 | 12(bar) | — | G13 (144×5, r12) |
+
+**좌측 정렬선 22 · 아이콘↔텍스트 gap 15 · 카드 r20 / 칩 r6** — ② H절의 형태 시그니처를 전부 지켰다.
+
+---
+
+## 5. ② 실측과 어긋난 항목
+
+| 항목 | ② 실측 | 적용값 | 왜 / 화면에서 어떻게 보이나 |
 |---|---|---|---|
-| `ChangeBadge` | `Value.characters` `+2.45%`→`−1.08%` | ✅ | |
-| `ChangeBadge` | `Value.fills` red→blue, 보드 `fills` 틴트 교체 | ✅ | penpot 형식이라 통과 |
-| `StockRow` | `Name`·`Code`·`Price`·`Change` 4개 `characters` 동시 | ✅ | 중첩 2단계 자식도 오버라이드됨 |
-| `StockRow` | `Change.fills` → `changeColor(-1.32)` | ✅ | 하락 파랑 정상 적용 |
-| `ChipToggle` | 보드 `fills`+`strokes`+`Label.fills` 3개 동시 (off→on) | ✅ | 선택 상태를 인스턴스로 표현 가능 |
-| `PrimaryButton` | 보드 `fills` red→blue + `Label.characters` | ✅ | 매수/매도 변형이 인스턴스로 해결 |
-| **원본 무결성** | 위 전부 수행 후 main 컴포넌트 재확인 | ✅ | `삼성전자`/`+2.45%`/`#e72336` 그대로 |
-
-**결론: ⑥은 새 도형을 그릴 필요가 없다.** 23종 인스턴스 + `characters`/`fills` 오버라이드로 조립된다.
-
-> ⚠️ 중첩 자식(`Info > Name`)을 찾을 땐 `inst.children[0].children[0]` 같은 인덱스 접근 대신
-> **이름으로 찾아라.** 인덱스는 flex 정착 타이밍에 따라 흔들린다.
-> ```js
-> const byName = (root, n) => penpotUtils.findShape(s => s.name === n, root);
-> ```
+| 상태바 폰트 | `SF Pro` 17/400 | **`Noto Sans KR` 16/400** | SF Pro 서버에 없음(`00`). 16은 ④ 스케일 값(17은 미등장 크기라 제외). 시각 차이 미미 |
+| Button 높이 | 실측 없음 | **50** | ② F-1 "주 행은 55 이상" 권고와 터치 44 사이에서 결정. 버튼은 행이 아니라 액션이므로 50 |
+| WatchRow 높이 | G3 = 55 | **58** | 오토레이아웃 hug 결과. 아바타 38 + pad 7×2 + 2줄 텍스트로 자연 산출 |
+| ActivityCard 높이 | G4 = 69 | **77** | 3줄(제목/별점/가격)이라 G4(2줄)보다 큼. 아바타 57·pad 6은 G4 준수 |
+| HomeIndicator `#d9d9d9` | OS chrome (② I절 제외) | **그대로 사용** | OS 요소라 토큰 팔레트 밖. 감사기에 명시적 예외로 등록 |
 
 ---
 
-## C. 인스턴스 생성 방법 (⑥이 그대로 쓰는 코드)
+## 6. 🔴 인스턴스 생성 방법 (⑥이 쓸 정확한 코드)
+
+### 6-1. 이름 충돌 — 반드시 `path` 로 좁혀라
+
+**Penpot 은 `"TR/Badge/Discount"` 를 `path="TR / Badge"` + `name="Discount"` 로 쪼갠다.**
+(슬래시 주변에 공백이 삽입된다.)
+
+기존 죽은 36개 중 **`Discount`(path `Badge`) 가 이미 존재한다.**
+→ **`name` 만으로 찾으면 죽은 것이 잡힌다.** 실측으로 확인했다:
+
+| 조회 | path | `mainInstance()` |
+|---|---|---|
+| `name === "Discount"` 첫 번째 | `Badge` | **`null` (죽음)** |
+| `path === "TR / Badge" && name === "Discount"` | `TR / Badge` | **살아 있음** |
 
 ```js
-// ───────── 모든 스크립트 첫 줄에서 Page 재고정 (openPage는 다음 호출까지 유지되지 않는다)
-penpot.openPage(penpotUtils.getPageByName("김주철"));
+// ⑥ 저작 스크립트 맨 위 — Page 재고정
+const PAGE = penpotUtils.getPageById("cf8cfb09-3416-4c32-a2eb-38e95e5c2be9");
+if (PAGE.name !== "3-toss-result") throw new Error("Page mismatch");
 
-// ───────── 프리픽스로 좁혀 찾기 (남의 컴포넌트가 잡히는 것을 막는다)
-const findComp = (short) =>
-  penpot.library.local.components.find(
-    (c) => c.name === short && String(c.path || "").indexOf("KJC") === 0
-  );
-
-// ───────── 이름으로 자식 찾기 (인덱스 접근 금지)
-const byName = (root, n) => penpotUtils.findShape((s) => s.name === n, root);
-
-// ───────── 인스턴스 1개 만들고 데이터 얹기
-const row = findComp("StockRow").instance();
-byName(row, "Name").characters  = "SK하이닉스";
-byName(row, "Code").characters  = "000660";
-byName(row, "Price").characters = "184,500";
-const ch = byName(row, "Change");
-ch.characters = changeLabel(-1.32);       // "−1.32%"
-ch.fills      = fill(changeColor(-1.32)); // 하락 → #236ae7
-// 부모 보드(화면)에 붙인다. 부모가 flex면 위치는 자동.
-screenBoard.appendChild(row);
-```
-
-### 리스트를 채우는 표준 패턴 (Watchlist·ThemeDetail·StockSearch 공용)
-
-```js
-const STOCKS = [
-  { name: "삼성전자",     code: "005930", price: "71,200",  chg:  2.45 },
-  { name: "SK하이닉스",   code: "000660", price: "184,500", chg: -1.32 },
-  { name: "한미반도체",   code: "042700", price: "98,400",  chg:  5.12 },
-  { name: "LG에너지솔루션", code: "373220", price: "412,000", chg:  0    },
-];
-const comp = findComp("StockRow");
-STOCKS.forEach((s) => {
-  const r = comp.instance();
-  byName(r, "Name").characters  = s.name;
-  byName(r, "Code").characters  = s.code;
-  byName(r, "Price").characters = s.price;
-  const c = byName(r, "Change");
-  c.characters = changeLabel(s.chg);
-  c.fills      = fill(changeColor(s.chg));
-  listBoard.appendChild(r);   // listBoard = column flex, rowGap = T.space.xl(32) 권장
-});
-```
-
-### 상태 변형 오버라이드 치트시트
-
-```js
-// 칩 선택(on)
-chip.fills   = fill(T.color.brand.primary);
-chip.strokes = stroke(T.color.brand.primary, 1);
-byName(chip, "Label").fills = fill(T.color.text.inverse);
-
-// 버튼 매도(파랑) / 비활성
-btn.fills = fill(T.color.state.down);
-btn.fills = fill(T.color.border.strong);   // disabled
-
-// 탭바 활성 인덱스 이동 (i번째만 브랜드색)
-["관심","발견","검색","내정보"].forEach((l, i) => {
-  const on = i === activeIndex;
-  const tab = byName(bar, "Tab-" + l);
-  byName(tab, "Icon").fills  = fill(on ? T.color.brand.primary : T.color.text.secondary);
-  byName(tab, "Label").fills = fill(on ? T.color.brand.primary : T.color.text.secondary);
-});
-
-// 기간 탭 활성 이동
-["1일","1주","1개월","3개월","1년"].forEach((l, i) => {
-  const on = i === activePeriod;
-  const seg = byName(tabs, "Seg-" + l);
-  seg.fills = on ? fill(T.color.bg.surface) : [];
-  byName(seg, "Label").fills = fill(on ? T.color.text.primary : T.color.text.secondary);
-});
-
-// StatusBanner 톤 전환 (error ↔ info)
-banner.fills = fill(T.color.state.errorTint);          // 또는 brand.tint
-byName(banner, "Icon").fills    = fill(T.color.state.error);
-byName(banner, "Message").fills = fill(T.color.state.error);
-
-// ConsensusBar 비율 조정 (합이 358이 되게)
-byName(bar, "SegBuy").resize(200, 12);
-byName(bar, "SegHold").resize(100, 12);
-byName(bar, "SegSell").resize(58, 12);
-
-// 로딩 변형: StockRow의 가격·등락만 스켈레톤처럼 (종목명 유지)
-byName(row, "Price").characters  = "";
-byName(row, "Change").characters = "";
-```
-
----
-
-## D. 저작 코드 맨 위에 붙일 전문 (⑥ 복붙용 · **교정판**)
-
-> `04-tokens.md` B절 그대로 + **`applyText()`만 실제 API에 맞게 교정**했다.
-> 토큰 값은 하나도 바꾸지 않았다.
-
-```js
-penpot.openPage(penpotUtils.getPageByName("김주철"));   // 🔴 항상 첫 줄
-
-const T = { /* 04-tokens.md B절 T 객체 전체를 그대로 붙인다 */ };
-
-const fill = (hex, opacity = 1) => [{ fillColor: hex, fillOpacity: opacity }];
-const stroke = (hex = T.color.border.default, width = 1) => [
-  { strokeColor: hex, strokeWidth: width, strokeAlignment: "inner", strokeOpacity: 1 },
-];
-const findFont = (name) => penpot.fonts.all.find((f) => f.name === name);
-
-// 🔴 교정: f.id→f.fontId, v.weight→v.fontWeight, v.id→v.fontVariantId
-const applyText = (node, o) => {
-  const weight     = o.weight     === undefined ? T.font.weight.regular    : o.weight;
-  const color      = o.color      === undefined ? T.color.text.primary     : o.color;
-  const lineHeight = o.lineHeight === undefined ? T.font.lineHeight.normal : o.lineHeight;
-  const f = findFont(T.font.family);
-  if (f) {
-    node.fontId = f.fontId;
-    node.fontFamily = f.name;
-    const v = f.variants.find((x) => String(x.fontWeight) === String(weight));
-    if (v) { node.fontVariantId = v.fontVariantId; node.fontWeight = String(weight); }
-  }
-  node.fontSize      = String(o.size);
-  node.lineHeight    = String(lineHeight);
-  node.letterSpacing = String(T.font.letterSpacing);
-  node.fills         = fill(color);
-  node.growType      = "auto-height";
-  if (o.align) node.align = o.align;
-  return node;
+// 🔴 컴포넌트 조회는 반드시 이 함수로. 이름만으로 찾으면 죽은 컴포넌트가 잡힌다.
+const findComp = (path, name) => {
+  const c = penpot.library.local.components.filter(
+    x => x.path === "TR / " + path && x.name === name);
+  if (c.length !== 1) throw new Error("조회 실패: TR / " + path + " / " + name);
+  return c[0];
 };
 
-const changeColor = (v) => v > 0 ? T.color.state.up     : v < 0 ? T.color.state.down     : T.color.state.flat;
-const changeTint  = (v) => v > 0 ? T.color.state.upTint : v < 0 ? T.color.state.downTint : T.color.bg.avatar;
-const changeLabel = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(2) + "%";
-
-const findComp = (short) =>
-  penpot.library.local.components.find(
-    (c) => c.name === short && String(c.path || "").indexOf("KJC") === 0
-  );
-const byName = (root, n) => penpotUtils.findShape((s) => s.name === n, root);
-
-// 🔴 고정 폭 텍스트: resize 후 반드시 auto-height로 되돌린다(안 그러면 글자가 잘린다)
-const mkText = (chars, o) => {
-  const t = penpot.createText(chars);
-  applyText(t, o);
-  if (o.width !== undefined) {
-    t.growType = "fixed";
-    t.resize(o.width, o.height || Math.ceil(o.size * 1.34));
-    t.growType = "auto-height";
-  }
-  if (o.name) t.name = o.name;
-  return t;
-};
+// 인스턴스 생성 + 오버라이드
+const row = findComp("FlightRow", "Direct").instance();
+row.x = 0; row.y = 200;
+penpotUtils.findShape(s => s.name === "AirlineName", row).characters = "진에어";
+penpotUtils.findShape(s => s.name === "Price", row).characters = "₩176,400";
 ```
 
+### 6-2. 자식 노드 이름 (오버라이드 대상)
+
+`penpotUtils.findShape(s => s.name === "...", instance)` 로 찾는다.
+
+| 컴포넌트 | 자식 이름 |
+|---|---|
+| `Badge/*` | `Label` |
+| `Button/*` | `Label` |
+| `Chip/*` | `Label` |
+| `FlightRow/*` | `AirlineName` `FlightNo` `Times` `Meta` `Price` `AirlineMark` |
+| `Flight/StopoverBar` | `LayoverNote` |
+| `PriceDayCell/*` | `Day` `Price` |
+| `PriceDelta/*` | `Delta` |
+| `Card/DealCard` | `Photo` `City` `WasPrice` `NowPrice` |
+| `Card/ActivityCard` | `Photo` `Title` `RatingRow` `Price` |
+| `Section/SectionHeader` | `Title` `MoreLink` |
+| `Watch/WatchRow` | `CityPhoto` `City` `Price` `Delta` |
+| `Compare/CompareRow` | `RowLabel` `ValueA` `ValueB` |
+| `Compare/CompareTray` | `Counter` `Label`(버튼 안) |
+| `Fare/FareOption` | `Grade` `Price` `Condition-1..3` `Radio` |
+| `State/EmptyState` | `Icon` `Title` `Description` |
+| `State/SuggestionRow` | `Label` `Count` |
+| `Common/InfoRow` | `Label` `Value` |
+| `Shell/TabBar` | `TabItem-1..5` → 각 `Icon` `Label` |
+| `Shell/TopBar` | `BackIcon` `Title` `ActionIcon` |
+| `Shell/StatusBar` | `Time` `Indicators` |
+
 ---
 
-## E. ⑥에게 넘기는 조립 규칙
+## 7. 오버라이드 시험 결과 (실제로 시험함)
 
-1. **새 도형을 그리지 않는다.** 23종 인스턴스로 조립한다. 없는 부품이 필요하면 ⑤로 돌아온다.
-2. 화면 보드는 `390` 폭 · **column flex** · `horizontalPadding = 16`.
-   단 `AppBar`·`TabBar`·`DividerBlock`은 폭이 390이므로 **패딩 밖(전폭)** 에 둔다.
-   → 화면 보드 패딩을 0으로 두고, 콘텐츠만 358 폭 내부 보드로 감싸는 편이 안전하다.
-3. 리스트 행 사이는 `T.space.xl(32)`이 아니라 **`rowGap = 0` + 행 자체 높이 72**를 쓴다.
-   (`StockRow`가 이미 상하 16 패딩을 품고 있다.)
-4. 하단 고정 액션의 Spacer 높이는 **`657`** (`04` A-8 계산값). `layoutGrow`를 쓰지 않는다.
-5. 스크림을 만들지 않는다. **뒤 화면 보드의 `opacity`를 낮춘다.**
-6. 자식 좌표가 `0,0`으로 보여도 **다음 호출에서 다시 읽기 전에는 깨졌다고 판단하지 않는다.**
-7. `export_shape`가 `http error`면 **재시도**한다. 첫 장이 뭉쳐 나오면 **재-export 1회.**
-8. 마감 처리: 전 화면의 `growType === "auto-height"` 텍스트를 `resize`로 재계산시킨다.
+| 항목 | 시험 내용 | 됐나 | 비고 |
+|---|---|---|---|
+| 텍스트 `characters` | `₩232,000` → `₩176,400`, `대한항공` → `진에어` | **✅** | ⑥이 데이터 다른 행을 인스턴스 재사용으로 처리 가능 |
+| penpot 형식 `fills` (보드) | 카드 배경 `#17171b` → `#1f2026` | **✅** | `{fillColor, fillOpacity}` 형식이라 뚫린다 |
+| penpot 형식 `fills` (자식 텍스트) | 라벨 색 교체 | **✅** | |
+| `fontWeight` 유지 | 인스턴스에서 700 유지 | **✅** | |
+| 크기 유지 | 390×55 유지 | **✅** | |
+
+> **figma 형식 `fills`(`{type:"SOLID", color:{r,g,b}}`)는 쓰지 않았다.** 전부 penpot 형식이라
+> 위 오버라이드가 성립한다. ⑥도 반드시 penpot 형식만 쓸 것.
 
 ---
 
-## F. 실패·보류
+## 8. 🔴 저작 중 실측으로 발견한 함정 3개 (⑥·⑦ 필독)
+
+**④의 지침 중 2개가 실제 환경에서 틀렸다.** 그대로 따르면 조용히 깨진다.
+
+### 8-1. `applyToText` 에 **문자열**을 주면 조용히 400 으로 떨어진다 🔴 가장 위험
+
+`04-tokens.md` G절은 `NOTO.applyToText(node, "700")` 을 지시한다. **이건 작동하지 않는다.**
+
+| 호출 | 결과 `fontWeight` |
+|---|---|
+| `applyToText(t, "700")` (문자열) | **`400`** ← 에러 없이 무성 실패 |
+| `applyToText(t, variant700)` (**FontVariant 객체**) | **`700`** ✅ |
+| `t.fontWeight = "700"` (직접 대입) | **throw** `Font weight '700' not supported` |
+
+→ 이 때문에 32개 컴포넌트의 텍스트가 **전부 weight 400 으로 평평**해졌었고,
+   **30개 텍스트 노드를 사후 복구**했다. 올바른 코드:
+
+```js
+const NOTO = penpot.fonts.findByName("Noto Sans KR");
+const VARIANT = {
+  "400": NOTO.variants.find(v => v.fontWeight === "400" && v.fontStyle !== "italic"),
+  "500": NOTO.variants.find(v => v.fontWeight === "500" && v.fontStyle !== "italic"),
+  "700": NOTO.variants.find(v => v.fontWeight === "700" && v.fontStyle !== "italic"),
+};
+NOTO.applyToText(textNode, VARIANT["700"]);   // 🔴 반드시 객체
+```
+
+**⑦ 체크 포인트**: 텍스트 위계가 안 보이면 `fontWeight` 가 전부 400인지 먼저 의심할 것.
+
+### 8-2. hug 텍스트에 `growType="auto-height"` 를 쓰면 **폭이 1로 붕괴**한다
+
+`04` G-1 은 "모든 텍스트 `growType = "auto-height"`" 를 지시하지만, 이건 **고정 폭 칸 전용**이다.
+뱃지·버튼 라벨처럼 내용에 맞춰 줄어야 하는 칸에 쓰면 폭이 **1px** 이 되어 컨테이너가 패딩만 남는다
+(실측: 뱃지가 15×48 로 붕괴).
+
+| 용도 | growType | 결과 |
+|---|---|---|
+| hug 라벨 (뱃지·버튼·칩) | **`auto-width`** | 56×22 정상 |
+| 고정 폭 칸 (행 제목·가격열) | **`auto-height`** | 폭 유지, 세로만 자람 |
+
+→ 이 문서의 모든 컴포넌트는 이 규칙으로 만들었다. ⑥도 동일하게 적용할 것.
+
+### 8-3. `resize()` 는 `growType` 을 `fixed` 로 되돌린다
+
+고정 폭 칸을 만들 때 `resize()` 직후 **반드시 `growType`을 다시 `auto-height`로 되돌린다.**
+안 그러면 Noto 가 Spoqa 보다 넓어 **글자가 잘린다**(② B-2 경고).
+
+---
+
+## 9. ⚠️ 검증 방법 — PNG 대신 무엇을 썼나
+
+**`export_shape` 가 이 세션 내내 실패했다.** 서비스 장애로 판단한다.
+
+| 시도 | 대상 | 결과 |
+|---|---|---|
+| 9회 이상 | 개별 shape / `page`, `png` / `svg` | `Failed to fetch` → `http error` |
+| 대조군 | `use_figma` 코드 실행 | **정상 동작 내내 유지** |
+
+플러그인 연결은 살아 있고 코드 실행은 전부 성공했으므로 **연결 문제가 아니라
+export 서비스 자체의 문제**다. 따라서 "PNG 로 눈으로 본다"를 아래 **2중 대체 검증**으로 바꿨다.
+
+### 9-1. 속성 감사기 (전 컴포넌트 32개 통과, 이슈 0)
+
+```js
+// 잘림 / 무성 폰트 대체 / 토큰 외 색 / 그림자를 기계적으로 잡는다
+storage.audit(board) → string[]
+```
+
+검출 항목:
+- 텍스트 `width <= 1` 또는 `height <= 1` (**잘림·붕괴**)
+- `growType === "fixed"` (**잘림 위험**)
+- `fontId` 빈 값 (**무성 폰트 대체**)
+- `04` 팔레트 밖 `fillColor` / `strokeColor` (**토큰 이탈**)
+- `shadows.length > 0` (**② 실측 0건 — 금지**)
+
+**결과: 32개 전부 이슈 0건.**
+
+### 9-2. SVG 렌더 검증 (실제 렌더 산출물 확인)
+
+`penpot.generateMarkup([main], {type:"svg"})` 로 **실제 렌더 마크업**을 뽑아 확인했다.
+
+| 컴포넌트 | 크기 | SVG 생성 | 텍스트 수 |
+|---|---|---|---|
+| `Shell/TabBar` | 390×80 | ✅ 40,548 B | 5 |
+| `FlightRow/Direct` | 390×55 | ✅ 32,325 B | 5 |
+| `Card/DealCard` | 172×196 | ✅ 15,969 B | 3 |
+| `Badge/Discount` | 56×22 | ✅ 3,676 B | 1 |
+| `Compare/CompareTray` | 390×68 | ✅ 10,748 B | 2 |
+| `State/EmptyState` | 390×212 | ✅ 7,123 B | 2 |
+
+`FlightRow/Direct` SVG 안에 `대한항공` · `직항` · `₩232,000` 이 **실제 문자열로 존재**함을 확인했다
+(한글 렌더 누락·두부 현상 없음).
+
+> **⑦에게**: `export_shape` 가 복구되면 **가장 먼저 PNG 를 뽑아 육안 확인**할 것.
+> 위 검증은 "치수·색·폰트·잘림"은 잡지만 **시각적 균형·정렬 인상**은 잡지 못한다.
+> 특히 **8-1 의 weight 복구가 눈으로도 맞는지** 확인이 필요하다.
+
+---
+
+## 10. 배치 좌표 규칙 (⑥이 반드시 지킬 것)
+
+| 영역 | y 범위 | 용도 |
+|---|---|---|
+| **컴포넌트 선반** | **y ≤ -635** | ⑤가 만든 main instance 32개. **⑥은 건드리지 않는다** |
+| **화면 저작 영역** | **y ≥ 0** | ⑥이 `New/*` board 를 놓는 곳 |
+
+컴포넌트 main instance 실측 범위: **x 0~920 / y -1880 ~ -650** (최하단 -635).
+③ 6절의 화면 배치 가이드(가로 490 간격, 1행 y=0 시작)와 **겹치지 않는다.**
+
+> main instance 를 옮기거나 이름을 바꾸면 **플러그인이 멈춘다.** ⑥은 `.instance()` 만 쓴다.
+
+---
+
+## 11. ③ 컴포넌트 후보 대비 커버리지
+
+③ 5절 후보 27종 중 **컴포넌트로 승격한 것과 ⑥이 직접 조립할 것**을 구분했다.
+
+| ③ 후보 | 처리 | ⑤ 컴포넌트 |
+|---|---|---|
+| `BottomTabBar` | ✅ | `Shell/TabBar` |
+| `PrimaryButton` / `SecondaryButton` | ✅ | `Button/Primary` · `Button/Secondary` |
+| `SectionHeader` | ✅ | `Section/SectionHeader` |
+| `Badge` | ✅ 5변형 | `Badge/*` |
+| `DealCard` | ✅ | `Card/DealCard` |
+| `ActivityCard` | ✅ | `Card/ActivityCard` |
+| `FlightRow` | ✅ 2변형 | `FlightRow/Direct` · `Stopover` |
+| `LayoverNote` | ✅ | `Flight/StopoverBar` |
+| `AirlineMark` | ✅ 내장 | `FlightRow/*` 의 `AirlineMark` |
+| `PriceText` | ✅ 내장 | 각 행의 `Price` (16/700) |
+| `DateChip` | ✅ 3변형 | `PriceDayCell/*` |
+| `FilterChip` | ✅ 2변형 | `Chip/Default` · `Selected` |
+| `WatchRow` | ✅ | `Watch/WatchRow` |
+| `PriceDelta` | ✅ 2변형 | `PriceDelta/Down` · `Up` |
+| `CompareTrayBar` | ✅ | `Compare/CompareTray` |
+| `CompareRow` | ✅ | `Compare/CompareRow` |
+| `EmptyState` | ✅ | `State/EmptyState` |
+| `SkeletonRow` | ✅ | `State/SkeletonRow` |
+| `FareOptionCard` | ✅ | `Fare/FareOption` |
+| `InfoRow`/`ConditionRow` | ✅ | `Common/InfoRow` |
+| `SuggestionRow` | ✅ | `State/SuggestionRow` |
+| `RatingRow` | ✅ 내장 | `Card/ActivityCard` 의 `RatingRow` |
+| `SegmentedTabs` | ⬜ ⑥ 조립 | `Chip/*` 을 가로로 배열 |
+| `SheetGrabber`/`SheetHeader`/`SheetFooter` | ⬜ ⑥ 조립 | 시트 2개(#5·#6)에서만 사용 — 3절 clone 방식이라 컴포넌트 이득 적음 |
+| `CheckRow` | ⬜ ⑥ 조립 | `Common/InfoRow` + Radio 응용 |
+
+**미승격 사유**: ③ 5절 하단이 "⑤가 비용 대비 판단해 승격해도 된다. **강제하지 않는다**" 로
+위임한 항목이거나, clone 기반이라 인스턴스 이득이 작은 것들이다.
+
+---
+
+## 12. 실패·보류
 
 | 항목 | 무슨 일이 있었나 |
 |---|---|
-| `04-tokens.md` B절 `applyText()` | `f.id`/`v.weight`/`v.id`가 실제 API에 없어 **폰트가 안 잡혔다.** D절에서 교정. `04`의 B-2 스니펫이 `has400:false`를 낸 것도 같은 원인이며, **폰트 자체는 정상 존재**한다 |
-| `ChangeBadge` 1차 시도 | 등록 후 컴포넌트 이름을 바꿨더니 `path`가 날아가 프리픽스 조회가 실패. **지우고 새 이름으로 다시** 만들었다(이름 변경 금지 규칙대로) |
-| `ChipToggle`·`SectionHeader`·`SkeletonRow` 1차 시도 | 보드를 먼저 이동시킨 뒤 자식을 append 해 자식이 원점에 남았다. **지우고 순서를 바꿔 재작성** |
-| `AppBar` 1차 시도 | 실제로는 정상이었는데 **같은 호출 안에서 읽은 0,0 보고를 믿고** 지웠다. 재작성 후 정상 확인. ⑥은 이 실수를 반복하지 말 것 |
-| 한 호출에 3개 컴포넌트 저작 | `await` 누적으로 **30초 타임아웃.** 이후 **1~2개씩** 쪼개 실행 |
-| 전체 페이지 `export_shape` | `shapeId:"page"`는 30초 타임아웃. **컴포넌트 단위로만** 검증했다 |
-| 아이콘 | 실제 아이콘 패스가 없어 **`T.size.icon` 사각형 placeholder**로 뒀다(`BackIcon`·`ActionIcon`·`Tab-*/Icon`·`SearchIcon`·`Check`). ⑦이 아이콘 부재를 지적하면 ⑥이 `penpot.createPath` 또는 `uploadMediaUrl`로 교체 |
-| `PriceChart` | **23종 중 유일하게 만들지 않았다.** 폴리라인은 데이터 의존이라 컴포넌트화 이득이 없고 `StockDetail` 1곳에서만 쓰인다 → **⑥이 `penpot.createPath`로 직접 그린다**(`PeriodTabs`는 만들어 뒀다) |
-| 남의 컴포넌트 | 이 파일에 path 없는 `Button` 컴포넌트가 이미 존재. **프리픽스 조회 필수** |
+| **`export_shape` PNG 검증** | **전 시도 실패**(9회+, png/svg, shape/page 모두). 코드 실행은 정상이므로 export 서비스 장애로 판단. §9 의 속성 감사 + SVG 렌더 검증으로 대체. **⑦이 복구 후 육안 확인 필요** |
+| `m3-components_v2.md` | **저장소에 없다.** 치수 기준을 오케스트레이터 지시대로 `02` 실측값으로 삼았다(§4) |
+| 아이콘 SVG 파일 | 이번 실행에서는 **아이콘을 rect/ellipse 플레이스홀더**로 두었다. `TabBar`·`TopBar`의 `Icon`/`BackIcon` 은 이름이 잡혀 있어 ⑥·⑦이 `createShapeFromSvg` 로 교체 가능하다. 도형 조합으로 아이콘 모양을 흉내내지는 **않았다**(오탐 유발 회피) |
+| `fontWeight` 사후 복구 | 8-1 함정으로 30개 텍스트가 400 으로 생성됨 → 전부 복구 완료. `StatusBar/Time` 은 과교정(700)되어 400 으로 재수정 |
 
-> 미룬 것은 `PriceChart` 하나뿐이다. ③이 요구한 나머지 22종 + `DividerBlock`(②G절 구획 규칙)까지 **23종 등록 완료.**
+---
+
+## 13. ⑥으로의 인계 한 줄 요약
+
+> `findComp(path, name)` **로만** 컴포넌트를 찾고(이름만 쓰면 죽은 36개가 잡힌다),
+> `.instance()` 후 `characters` 와 **penpot 형식** `fills` 로 덮어라.
+> 텍스트를 새로 만들 땐 `applyToText` 에 **FontVariant 객체**를 넘기고(문자열은 400으로 죽는다),
+> hug 라벨은 `auto-width` · 고정 폭 칸은 `auto-height` 로 둬라.
+> 화면은 **y ≥ 0** 에만 짓는다.
