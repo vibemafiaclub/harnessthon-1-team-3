@@ -1,0 +1,9 @@
+<!--
+  check-circle — 성공/체결 완료 표식
+  색은 저작 시 04-tokens.md 의 state.success / state.successTint 로 덮어쓴다.
+  (여기 박힌 HEX는 단독으로 열어볼 때의 기본값일 뿐, 저작 코드가 토큰으로 교체한다.)
+-->
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="24" cy="24" r="23" fill="#E0FFEF" stroke="#1C9C5C" stroke-width="2"/>
+  <path d="M15 24.5L21 30.5L33 18.5" stroke="#1C9C5C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

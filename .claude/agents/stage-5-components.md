@@ -85,6 +85,19 @@ description: 토큰과 화면 목록을 바탕으로 Penpot에 재사용 컴포�
 - `board.insertChild(index, node)` 로 자식 순서를 고칠 수 있다.
 - top-level `await` 가 된다. 이미지: `const img = await penpot.uploadMediaUrl(name, url)`
   → `rect.fills = [{ fillOpacity:1, fillImage: img }]`
+- **`penpot.createShapeFromSvg(svgString)` 이 된다.** 아이콘은 이걸로 만든다. (아래 절차 5-4)
+
+### 🔴 아이콘 — 도형 조합으로 흉내내지 않는다
+
+체크·화살표·별 같은 아이콘을 **회전 rectangle이나 도형 조합으로 흉내내면 안 된다.**
+실제로 그렇게 만들었다가 아래 두 문제가 한꺼번에 터졌다.
+
+- 회전 rect로 만든 체크는 **부모-자식 관계가 없다.** 컨테이너 옆에 좌표로 얹히기만 한다.
+  → ⑦·⑧이 `children.length`로 아이콘 존재를 검증하면 **전부 오탐**이 난다.
+- 좌표로 얹힌 도형은 **보드를 옮기면 따라오지 않는다.** 레이아웃이 바뀔 때마다 어긋난다.
+
+**아이콘은 SVG 파일로 만들어 `createShapeFromSvg`로 넣는다.**
+그러면 진짜 `path`·`ellipse`로 들어오고, 그룹 하나의 **자식**이 되어 위 두 문제가 사라진다.
 
 ## 절차
 
@@ -126,7 +139,31 @@ description: 토큰과 화면 목록을 바탕으로 Penpot에 재사용 컴포�
    M3 문서에 **없는 컴포넌트**(제품 고유의 것)는 M3 0절 공통 규칙을 기준으로 만든다.
    — 4dp 그리드(4/8/12/16/24/32/48) · 최소 터치 48 · 화면 좌우 여백 16 · 아이콘 24
 
-5-3. **터치 영역과 시각 크기를 분리한다.**
+5-3. **아이콘은 SVG 파일로 만들고 그걸 불러 쓴다.**
+
+   ①~③이 요구한 아이콘(체크·화살표·검색·별 등)을 **먼저 목록화**한 뒤, 하나씩:
+
+   1. **저장소에 SVG 파일을 쓴다** — `assets/icons/{이름}.svg`
+      - `viewBox`를 M3 아이콘 크기(0 0 24 24, 큰 표식은 0 0 48 48)로 맞춘다
+      - 선 아이콘은 `stroke` + `stroke-linecap="round"` `stroke-linejoin="round"`
+      - **`currentColor`를 쓰지 않는다.** Penpot이 해석하지 못한다. HEX를 직접 넣고,
+        저작 시 `04-tokens.md` 값으로 덮어쓴다
+   2. **Penpot에 넣는다** — `const node = penpot.createShapeFromSvg(svgString)`
+   3. **색을 토큰으로 덮는다.** SVG에 박힌 HEX는 기본값일 뿐이다.
+      ```js
+      const circ = penpotUtils.findShape(s => s.type === "ellipse", node);
+      circ.fills   = [{ fillColor: T.color.state.success, fillOpacity: 1 }];
+      circ.strokes = [{ strokeColor: T.color.state.success, strokeOpacity: 1,
+                        strokeWidth: 2, strokeAlignment: "inner" }];
+      ```
+      `createShapeFromSvg`는 `base-background` 사각형을 하나 끼워 넣는다.
+      배경이 필요 없으면 **`fills = []`로 비운다.** (지우면 구조가 깨진다)
+   4. **PNG로 확인한다.** 넣자마자 `export_shape`로 눈으로 본다.
+
+   **SVG 파일은 저장소에 남긴다.** 다음 실행 때 같은 아이콘을 다시 그리지 않고,
+   팀원도 같은 파일을 쓴다. 저작 코드 안에 SVG 문자열을 박아두지 않는다.
+
+5-4. **터치 영역과 시각 크기를 분리한다.**
 
    아이콘 시각 크기(24)를 **그대로 터치 타깃으로 쓰지 않는다.**
    아이콘은 24로 두고, **투명한 히트 영역 컨테이너 48×48**로 감싼다. (M3 0절)
@@ -178,6 +215,13 @@ M3를 따르기로 한 결과 기존 자산과 달라진 것을 **전부** 적�
 | 항목 | ② 실측 | M3 적용값 | 화면에서 어떻게 보이나 |
 |---|---|---|---|
 
+## 아이콘 (SVG 파일)
+⑥·⑦이 같은 파일을 다시 쓴다. 새로 그리지 않는다.
+
+| 아이콘 | 파일 경로 | viewBox | 쓰인 컴포넌트 | 검증(PNG) |
+|---|---|---|---|---|
+| | `assets/icons/____.svg` | | | |
+
 ## 터치 영역
 | 컴포넌트 | 시각 크기 | 히트 영역 | 출처 |
 |---|---|---|---|
@@ -210,6 +254,9 @@ M3를 따르기로 한 결과 기존 자산과 달라진 것을 **전부** 적�
 - **M3 문서에서 색을 가져오지 않는다.** role 이름(`primary`·`on-surface`)은 Material
   팔레트 전제다. 색은 전부 `04-tokens.md`에서 오고, role은 거기에 대응시킨다.
 - **`미확인`으로 적힌 값을 추측해서 채우지 않는다.** `05`에 "확인 필요"로 남긴다.
+- **아이콘을 도형 조합(회전 rect 등)으로 흉내내지 않는다.** SVG 파일 + `createShapeFromSvg`를 쓴다.
+  도형 조합은 부모-자식 관계가 없어 검증이 오탐 나고, 보드를 옮기면 따라오지 않는다.
+- **SVG 문자열을 저작 코드에 박아두지 않는다.** `assets/icons/`에 파일로 남겨 재사용한다.
 - **특정 PRD 전용 하드코딩 금지.** 컴포넌트 이름·개수를 이 파일 지침에 박지 않는다.
   전부 `03`에서 온다.
 - 다른 단계의 출력 파일을 쓰지 않는다.
